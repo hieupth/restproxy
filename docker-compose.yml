@@ -3,7 +3,7 @@ secrets:
     file: ./password
 
 services:
-  pgsql:
+  postgresql:
     image: postgres:17
     container_name: postgresql
     user: "999:999"
@@ -32,7 +32,43 @@ services:
       - /tmp/pg_stats:noexec,nosuid,size=100m
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres"]
-      interval: 30s
+      interval: 10s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  pgbouncer:
+    image: edoburu/pgbouncer
+    container_name: pgbouncer
+    user: "999:999"
+    restart: always
+    ports:
+      - 6432:5432
+    links:
+      - postgresql:postgresql
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    cap_drop:
+      - ALL
+    volumes:
+      - ./pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ~/ssl:/ssl:ro
+    secrets:
+      - postgres_password
+    tmpfs:
+      - /tmp:noexec,nosuid,size=50m
+      - /var/run:noexec,nosuid,size=50m
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z postgresql 5432 || exit 1"]
+      interval: 10s
       timeout: 10s
       retries: 3
     logging:
